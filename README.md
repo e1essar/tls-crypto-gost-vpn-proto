@@ -91,3 +91,22 @@ docker-compose up --build
 - Хранилище в БД	Реализация DbKeyStore (PostgreSQL, SQLite и т.п.)
 - Автоматическое обновление ключей	Подключить генератор сертификатов, CRL
 - Механизмы авторизации	JWT / Cert-based Access Control
+
+## Ошибки и фиксы
+### 1.
+Открой файл /etc/ssl/openssl.cnf (или смотри OPENSSL_CONF):
+Добавь в конец:
+```
+openssl_conf = openssl_init
+
+[openssl_init]
+engines = engine_section
+
+[engine_section]
+gost = gost_section
+
+[gost_section]
+engine_id = gost
+dynamic_path = /usr/lib/x86_64-linux-gnu/engines-3/gost.so
+default_algorithms = ALL
+```
