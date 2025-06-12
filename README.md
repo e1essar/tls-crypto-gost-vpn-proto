@@ -37,6 +37,12 @@ tls-gost-app/
 - openssl >= 3.0 с включённым ENGINE API
 - libssl-dev, libcrypto++-dev (если нужно)
 
+### 🔧 Генерация GOST‑ключа и сертификата (certs/)
+```bash
+openssl genpkey -engine gost -algorithm GOST2012_256 -pkeyopt paramset:A -out key.pem
+openssl req -engine gost -new -x509 -key key.pem -out cert.pem -days 365 -subj "/CN=localhost"
+```
+
 ### 📦 Сборка
 ```bash
 mkdir build
