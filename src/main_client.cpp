@@ -1,4 +1,4 @@
-// src/main_client.cpp  (остатил без major‑изменений)
+// src/main_client.cpp 
 #include "net/Client.h"
 #include "crypto/GostCipher.h"
 #include "engine/EngineLoader.h"
