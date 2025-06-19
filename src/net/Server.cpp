@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
-#include <netdb.h> // Добавьте, если ещё не добавлено
+#include <netdb.h> 
 
 namespace tls {
 

@@ -8,7 +8,6 @@ namespace tls {
 
 class Server {
 public:
-    // Добавили certFile и keyFile
     Server(ICipherStrategy* cs, IKeyStore* ks, int port,
            const std::string& certFile, const std::string& keyFile);
     bool run();
