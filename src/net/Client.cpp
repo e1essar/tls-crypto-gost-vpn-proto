@@ -1,5 +1,5 @@
-// src/net/Client.cpp
 #include "Client.h"
+#include "Utils.h"
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <arpa/inet.h>
@@ -22,7 +22,7 @@ bool Client::run() {
     SSL_CTX* ctx = SSL_CTX_new(meth);
     if (!_cs->configureContext(ctx)) return false;
 
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE,nullptr);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in addr{};
@@ -38,18 +38,47 @@ bool Client::run() {
         return false;
     }
 
-    char buf[256];
-    while (fgets(buf, sizeof(buf), stdin)) {
-        SSL_write(ssl, buf, strlen(buf));
-        int n = SSL_read(ssl, buf, sizeof(buf)-1);
-        if (n <= 0) break;
-        buf[n] = 0;
-        printf("Server: %s", buf);
+    int listener = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in localAddr{};
+    localAddr.sin_family = AF_INET;
+    localAddr.sin_port = htons(8080);
+    localAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    bind(listener, (sockaddr*)&localAddr, sizeof(localAddr));
+    listen(listener, 5);
+    printf("Client listening on localhost:8080 for HTTP requests...\n");
+
+    while (true) {
+        int localSock = accept(listener, nullptr, nullptr);
+        if (localSock < 0) break;
+
+        char buf[8192];
+        int n = read(localSock, buf, sizeof(buf));
+        std::string request;
+        if (n > 0) {
+            request.assign(buf, n);
+            printf("\n[Client] Received HTTP request from browser:\n%s\n", request.c_str());
+        }
+
+        if (!sendWithLength(ssl, request.data(), request.size())) {
+            close(localSock);
+            break;
+        }
+
+        std::string response;
+        if (!receiveWithLength(ssl, response)) {
+            close(localSock);
+            break;
+        }
+        printf("[Client] Received response from server (%zu bytes):\n%s\n", response.size(), response.c_str());
+
+        write(localSock, response.data(), response.size());
+        close(localSock);
     }
 
     SSL_free(ssl);
     close(sock);
     SSL_CTX_free(ctx);
+    close(listener);
     return true;
 }
 
