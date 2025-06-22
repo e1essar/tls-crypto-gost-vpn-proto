@@ -1,18 +1,16 @@
-// include/storage/FileKeyStore.h
 #pragma once
-#include "IKeyStore.h"
-#include <string>
+#include "IKeyStore.h" // Подключает интерфейс
+#include <string> // Для путей к файлам
 
 namespace tls {
 
-/// Хранилище ключей на файловой системе
-class FileKeyStore : public IKeyStore {
+class FileKeyStore : public IKeyStore { // Наследуется от IKeyStore
 public:
-    FileKeyStore() = default;
-    ~FileKeyStore() override;  // <-- объявляем деструктор, но не определяем здесь
+    FileKeyStore() = default; // Конструктор по умолчанию
+    ~FileKeyStore() override; // Переопределяет деструктор
 
-    bool loadCertificate(SSL_CTX* ctx, const std::string& certFile) override;
-    bool loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) override;
+    bool loadCertificate(SSL_CTX* ctx, const std::string& certFile) override; // Загрузка сертификата
+    bool loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) override; // Загрузка ключа
 };
 
 } // namespace tls

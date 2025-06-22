@@ -1,4 +1,3 @@
-// src/main_server.cpp
 #include "net/Server.h"
 #include "crypto/GostCipher.h"
 #include "engine/EngineLoader.h"
@@ -7,10 +6,10 @@
 #include <iostream>
 
 int main(int argc, char* argv[]) {
-    int port = 4433;
-    std::string algorithm = "any";
-    std::string certFile = "../certs/cert.pem";
-    std::string keyFile  = "../certs/key.pem";
+    int port = 4433; // Порт по умолчанию
+    std::string algorithm = "any"; // Алгоритм по умолчанию
+    std::string certFile = "../certs/cert.pem"; // Сертификат по умолчанию
+    std::string keyFile  = "../certs/key.pem"; // Ключ по умолчанию
 
     static struct option longopts[] = {
         {"port",   required_argument, nullptr, 'p'},
@@ -34,8 +33,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    printf("Starting server on port %d with cipher '%s'\n",
-           port, algorithm.c_str());
+    printf("Starting server on port %d with cipher '%s'\n", port, algorithm.c_str());
 
     tls::EngineLoader loader;
     tls::FileKeyStore ks;
