@@ -24,7 +24,7 @@ bool Client::run() {
 
     // Включаем верификацию сертификата сервера
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
-    if (SSL_CTX_load_verify_locations(ctx, "../certs/cert.pem", nullptr) != 1) {
+    if (SSL_CTX_load_verify_locations(ctx, "certs/cert.pem", nullptr) != 1) {
         ERR_print_errors_fp(stderr);
         fprintf(stderr, "Ошибка загрузки доверенного сертификата (certs/cert.pem)\n");
         SSL_CTX_free(ctx);
