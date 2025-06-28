@@ -1,15 +1,14 @@
-// include/storage/IKeyStore.h
 #pragma once
-#include <openssl/ssl.h>
-#include <string>
+#include <openssl/ssl.h> // Для работы с SSL_CTX
+#include <string> // Для путей к файлам
 
 namespace tls {
 
-class IKeyStore {
+class IKeyStore { // Абстрактный класс для хранилища ключей
 public:
-    virtual ~IKeyStore() = default;
-    virtual bool loadCertificate(SSL_CTX* ctx, const std::string& certFile) = 0;
-    virtual bool loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) = 0;
+    virtual ~IKeyStore() = default; // Виртуальный деструктор
+    virtual bool loadCertificate(SSL_CTX* ctx, const std::string& certFile) = 0; // Загрузка сертификата
+    virtual bool loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) = 0; // Загрузка приватного ключа
 };
 
 } // namespace tls
