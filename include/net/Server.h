@@ -1,20 +1,21 @@
 #pragma once
 #include "../crypto/ICipherStrategy.h" // Для настройки шифрования
 #include "../storage/IKeyStore.h" // Для загрузки ключей
-#include <string> // Для хранения хоста
+#include <string> // Для хранения пути к сертификату и ключу
 
 namespace tls {
 
-class Client { // Класс клиента VPN
+class Server { // Класс сервера VPN
 public:
-    Client(ICipherStrategy* cs, IKeyStore* ks, const std::string& host, int port); // Конструктор
-    bool run(); // Метод запуска клиента
+    Server(ICipherStrategy* cs, IKeyStore* ks, int port, const std::string& certFile, const std::string& keyFile); // Конструктор
+    bool run(); // Метод запуска сервера
 
 private:
     ICipherStrategy* _cs; // Указатель на стратегию шифрования
     IKeyStore* _ks; // Указатель на хранилище ключей
-    std::string _host; // Адрес сервера
     int _port; // Порт сервера
+    std::string _certFile; // Путь к сертификату
+    std::string _keyFile; // Путь к ключу
 };
 
 } // namespace tls
