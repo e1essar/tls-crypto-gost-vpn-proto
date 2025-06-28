@@ -8,8 +8,8 @@
 int main(int argc, char* argv[]) {
     int port = 4433; // Порт по умолчанию
     std::string algorithm = "any"; // Алгоритм по умолчанию
-    std::string certFile = "../certs/cert.pem"; // Сертификат по умолчанию
-    std::string keyFile  = "../certs/key.pem"; // Ключ по умолчанию
+    std::string certFile = "certs/cert.pem"; // Сертификат по умолчанию
+    std::string keyFile  = "certs/key.pem"; // Ключ по умолчанию
 
     static struct option longopts[] = {
         {"port",   required_argument, nullptr, 'p'},
