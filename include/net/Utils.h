@@ -71,4 +71,7 @@ std::string readHttpResponse(int sock) {
     return response; // Возвращает ответ
 }
 
+// Добавление или замена заголовка X-Forwarded-For в HTTP-запросе
+std::string addOrReplaceXForwardedFor(const std::string& request, const std::string& clientIp);
+
 } // namespace tls
