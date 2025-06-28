@@ -59,7 +59,8 @@ bool Server::run() {
         while (true) {
             std::string request; // Запрос от клиента
             if (!receiveWithLength(ssl, request)) break; // Получает запрос
-            printf("\n[Server] Received HTTP request from client:\n%s\n", request.c_str());
+            printf("\n[Server] Received encrypted HTTP request from client (%zu bytes over TLS)\n", request.size());
+            printf("[Server] Decrypted HTTP request from client:\n%s\n", request.c_str());
 
             std::string host = getHostFromRequest(request); // Извлекает хост
             if (host.empty()) {
@@ -88,10 +89,12 @@ bool Server::run() {
                 continue;
             }
 
+            printf("[Server] Sending HTTP request to target server (%zu bytes, not encrypted):\n%s\n", modRequest.size(), modRequest.c_str());
             send(targetSock, modRequest.data(), modRequest.size(), 0); // Отправляет модифицированный запрос хосту
             std::string response = readHttpResponse(targetSock); // Читает ответ
             close(targetSock); // Закрывает сокет хоста
-            printf("[Server] Sending response to client (%zu bytes):\n%s\n", response.size(), response.c_str());
+            printf("[Server] Received HTTP response from target server (%zu bytes, not encrypted)\n", response.size());
+            printf("[Server] Sending encrypted response to client (%zu bytes over TLS)\n", response.size());
 
             if (!sendWithLength(ssl, response.data(), response.size())) break; // Отправляет ответ клиенту
             freeaddrinfo(res); // Освобождает память
