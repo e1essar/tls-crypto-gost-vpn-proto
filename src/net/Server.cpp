@@ -7,6 +7,8 @@
 #include <cstdio> // Для printf
 #include <cstring> // Для memset
 #include <netdb.h> // Для getaddrinfo
+#include <sys/socket.h> // Для getpeername
+#include <arpa/inet.h> // Для inet_ntoa
 
 namespace tls {
 
@@ -43,6 +45,12 @@ bool Server::run() {
     int client = accept(sock, nullptr, nullptr); // Принимает клиента
     if (client < 0) { perror("accept"); return false; }
 
+    // Получаем IP клиента
+    sockaddr_in peer_addr{};
+    socklen_t peer_len = sizeof(peer_addr);
+    getpeername(client, (sockaddr*)&peer_addr, &peer_len);
+    std::string clientIp = inet_ntoa(peer_addr.sin_addr);
+
     SSL* ssl = SSL_new(ctx); // Создает SSL-объект
     SSL_set_fd(ssl, client); // Привязывает сокет
     if (SSL_accept(ssl) <= 0) { // Выполняет TLS-handshake
@@ -59,6 +67,9 @@ bool Server::run() {
                 break;
             }
             printf("[Server] Connecting to target host: %s\n", host.c_str());
+
+            // Добавляем/заменяем X-Forwarded-For
+            std::string modRequest = addOrReplaceXForwardedFor(request, clientIp);
 
             struct addrinfo hints{}, *res; // Для DNS-разрешения
             memset(&hints, 0, sizeof(hints)); // Обнуляет структуру
@@ -77,7 +88,7 @@ bool Server::run() {
                 continue;
             }
 
-            send(targetSock, request.data(), request.size(), 0); // Отправляет запрос хосту
+            send(targetSock, modRequest.data(), modRequest.size(), 0); // Отправляет модифицированный запрос хосту
             std::string response = readHttpResponse(targetSock); // Читает ответ
             close(targetSock); // Закрывает сокет хоста
             printf("[Server] Sending response to client (%zu bytes):\n%s\n", response.size(), response.c_str());
@@ -92,6 +103,39 @@ bool Server::run() {
     close(sock); // Закрывает сокет сервера
     SSL_CTX_free(ctx); // Освобождает контекст
     return true; // Успех
+}
+
+// Вспомогательная функция для добавления/замены X-Forwarded-For
+std::string addOrReplaceXForwardedFor(const std::string& request, const std::string& clientIp) {
+    std::string out;
+    size_t pos = 0;
+    size_t xffPos = request.find("X-Forwarded-For:");
+    size_t headersEnd = request.find("\r\n\r\n");
+    if (headersEnd == std::string::npos) headersEnd = request.size();
+    if (xffPos != std::string::npos && xffPos < headersEnd) {
+        // Заменить существующий X-Forwarded-For
+        size_t lineEnd = request.find("\r\n", xffPos);
+        out = request.substr(0, xffPos);
+        out += "X-Forwarded-For: " + clientIp + "\r\n";
+        if (lineEnd != std::string::npos)
+            out += request.substr(lineEnd + 2);
+    } else {
+        // Вставить X-Forwarded-For после Host
+        size_t hostPos = request.find("Host:");
+        if (hostPos != std::string::npos) {
+            size_t hostEnd = request.find("\r\n", hostPos);
+            if (hostEnd != std::string::npos) {
+                out = request.substr(0, hostEnd + 2);
+                out += "X-Forwarded-For: " + clientIp + "\r\n";
+                out += request.substr(hostEnd + 2);
+            } else {
+                out = request + "X-Forwarded-For: " + clientIp + "\r\n";
+            }
+        } else {
+            out = request + "X-Forwarded-For: " + clientIp + "\r\n";
+        }
+    }
+    return out;
 }
 
 } // namespace tls
