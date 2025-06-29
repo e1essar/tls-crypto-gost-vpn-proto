@@ -70,7 +70,8 @@ bool Server::run() {
             printf("[Server] Connecting to target host: %s\n", host.c_str());
 
             // Добавляем/заменяем X-Forwarded-For
-            std::string modRequest = addOrReplaceXForwardedFor(request, clientIp);
+            // std::string modRequest = addOrReplaceXForwardedFor(request, clientIp);
+            std::string modRequest = request;
 
             struct addrinfo hints{}, *res; // Для DNS-разрешения
             memset(&hints, 0, sizeof(hints)); // Обнуляет структуру
