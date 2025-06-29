@@ -34,10 +34,6 @@ tls-crypto-gost-vpn-proto/
 │   ├── cert.pem
 │   └── key.pem
 │
-├── examples/              # Скрипты запуска без docker
-│   ├── start_server.sh
-│   └── start_client.sh
-│
 ├── CMakeLists.txt         # CMake-сборка
 ├── Dockerfile             # Docker-образ
 └── docker-compose.yml     # Композиция клиент + сервер
