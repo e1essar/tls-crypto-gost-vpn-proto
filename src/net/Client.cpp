@@ -22,18 +22,14 @@ bool Client::run() {
     SSL_CTX* ctx = SSL_CTX_new(meth); // Создает контекст TLS
     if (!_cs->configureContext(ctx)) return false; // Настраивает шифрование
 
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr); // Отключает верификацию сертификатов (небезопасно)
-    
     // Включаем верификацию сертификата сервера
-    // SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
-
-    // // Загружаем доверенные сертификаты
-    // if (SSL_CTX_load_verify_locations(ctx, "/etc/ssl/certs/ca-certificates.crt", nullptr) != 1) {
-    //     ERR_print_errors_fp(stderr);
-    //     fprintf(stderr, "Ошибка загрузки доверенных сертификатов\n");
-    //     SSL_CTX_free(ctx);
-    //     exit(1);
-    // }
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
+    if (SSL_CTX_load_verify_locations(ctx, "certs/cert.pem", nullptr) != 1) {
+        ERR_print_errors_fp(stderr);
+        fprintf(stderr, "Ошибка загрузки доверенного сертификата (certs/cert.pem)\n");
+        SSL_CTX_free(ctx);
+        return false;
+    }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0); // Создает TCP-сокет
     sockaddr_in addr{}; // Структура для адреса сервера
@@ -70,17 +66,22 @@ bool Client::run() {
             printf("\n[Client] Received HTTP request from browser:\n%s\n", request.c_str());
         }
 
+        // Логируем отправку зашифрованного пакета серверу
+        printf("[Client] Sending encrypted packet to server (%zu bytes over TLS)\n", request.size());
         if (!sendWithLength(ssl, request.data(), request.size())) { // Отправляет запрос серверу
             close(localSock);
             break;
         }
 
         std::string response; // Ответ от сервера
+        // Логируем ожидание зашифрованного ответа
+        printf("[Client] Waiting for encrypted response from server...\n");
         if (!receiveWithLength(ssl, response)) { // Получает ответ
             close(localSock);
             break;
         }
-        printf("[Client] Received response from server (%zu bytes):\n%s\n", response.size(), response.c_str());
+        printf("[Client] Received encrypted response from server (%zu bytes over TLS)\n", response.size());
+        printf("[Client] Decrypted response from server:\n%s\n", response.c_str());
 
         write(localSock, response.data(), response.size()); // Отправляет ответ браузеру
         close(localSock); // Закрывает соединение с браузером
