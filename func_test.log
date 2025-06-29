@@ -175,3 +175,43 @@ Connection: keep-alive
 </div>
 </body>
 </html>
+
+-------------------------------------------------------------------------------
+
+└─$ ./server --port 4433 
+Starting server on port 4433 with cipher 'any'
+Configuring GOST cipher list: GOST2012-MAGMA-MAGMAOMAC:GOST2012-KUZNYECHIK-KUZNYECHIKOMAC
+Negotiated cipher: GOST2012-MAGMA-MAGMAOMAC
+
+[Server] Received encrypted HTTP request from client (472 bytes over TLS)
+[Server] Decrypted HTTP request from client:
+GET http://example.com/ HTTP/1.1
+Host: example.com
+
+[Server] Connecting to target host: example.com
+[Server] Sending HTTP request to target server (500 bytes, not encrypted):
+GET http://example.com/ HTTP/1.1
+Host: example.com
+
+[Server] Received HTTP response from target server (250 bytes, not encrypted)
+[Server] Sending encrypted response to client (250 bytes over TLS)
+
+-------------------------------------------------------------------------------
+
+└─$ ./client --host 127.0.0.1 --port 4433
+Starting client to 127.0.0.1:4433 with cipher 'any'
+Configuring GOST cipher list: GOST2012-MAGMA-MAGMAOMAC:GOST2012-KUZNYECHIK-KUZNYECHIKOMAC
+Negotiated cipher: GOST2012-MAGMA-MAGMAOMAC
+Client listening on localhost:8080 for HTTP requests...
+
+[Client] Received HTTP request from browser:
+GET http://example.com/ HTTP/1.1
+Host: example.com
+
+[Client] Sending encrypted packet to server (472 bytes over TLS)
+[Client] Waiting for encrypted response from server...
+[Client] Received encrypted response from server (250 bytes over TLS)
+[Client] Decrypted response from server:
+HTTP/1.1 304 Not Modified
+Content-Type: text/html
+
