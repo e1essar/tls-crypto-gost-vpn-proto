@@ -1,9 +1,8 @@
 #pragma once
-#include "IEngineLoader.h" // Подключает интерфейс
+#include "IEngineLoader.h"
 
 namespace tls {
-class EngineLoader : public IEngineLoader { // Наследуется от IEngineLoader
+class EngineLoader : public IEngineLoader {
 public:
-    ENGINE* loadEngine(const std::string& engineId) override; // Реализация загрузки движка
-};
+    ENGINE* loadEngine(const std::string& engineId) override;
 }

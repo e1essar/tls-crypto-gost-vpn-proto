@@ -1,12 +1,12 @@
-#pragma once // Предотвращает множественное включение файла
-#include <openssl/ssl.h> // Подключает OpenSSL для работы с SSL/TLS
+#pragma once 
+#include <openssl/ssl.h> 
 
-namespace tls { // Пространство имен tls для изоляции кода проекта
+namespace tls {
 
-class ICipherStrategy { // Абстрактный базовый класс для стратегии шифрования
+class ICipherStrategy { 
 public:
-    virtual ~ICipherStrategy() = default; // Виртуальный деструктор для корректного удаления через указатель на базовый класс
-    virtual bool configureContext(SSL_CTX* ctx) = 0; // Чисто виртуальный метод для настройки SSL_CTX (контекста TLS)
+    virtual ~ICipherStrategy() = default; 
+    virtual bool configureContext(SSL_CTX* ctx) = 0;
 };
 
 } // namespace tls

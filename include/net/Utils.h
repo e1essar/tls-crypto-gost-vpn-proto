@@ -1,63 +1,59 @@
 #pragma once
-#include <openssl/ssl.h> // Для работы с SSL
-#include <string> // Для работы со строками
-#include <arpa/inet.h> // Для сетевых функций (htonl, ntohl)
+#include <openssl/ssl.h> 
+#include <string> 
+#include <arpa/inet.h> 
 
 namespace tls {
 
-// Отправка данных через SSL с префиксом длины
 bool sendWithLength(SSL* ssl, const char* data, size_t len) {
-    uint32_t lenNet = htonl(len); // Переводит длину в сетевой порядок байтов (big-endian)
-    if (SSL_write(ssl, &lenNet, 4) != 4) return false; // Отправляет 4 байта длины
-    if (SSL_write(ssl, data, len) != static_cast<int>(len)) return false; // Отправляет данные
-    return true; // Успех
+    uint32_t lenNet = htonl(len); 
+    if (SSL_write(ssl, &lenNet, 4) != 4) return false; 
+    if (SSL_write(ssl, data, len) != static_cast<int>(len)) return false; 
+    return true;
 }
 
-// Получение данных через SSL с префиксом длины
 bool receiveWithLength(SSL* ssl, std::string& data) {
-    uint32_t lenNet; // Переменная для длины в сетевом порядке
-    if (SSL_read(ssl, &lenNet, 4) != 4) return false; // Читает 4 байта длины
-    size_t len = ntohl(lenNet); // Переводит длину в хост-порядок (little-endian)
-    data.resize(len); // Устанавливает размер строки под данные
-    size_t total = 0; // Счетчик прочитанных байтов
-    while (total < len) { // Читает данные порциями
-        int n = SSL_read(ssl, &data[total], len - total); // Читает оставшиеся байты
-        if (n <= 0) return false; // Ошибка или конец соединения
-        total += n; // Увеличивает счетчик
+    uint32_t lenNet; 
+    if (SSL_read(ssl, &lenNet, 4) != 4) return false; 
+    size_t len = ntohl(lenNet); 
+    data.resize(len); 
+    size_t total = 0; 
+    while (total < len) { 
+        int n = SSL_read(ssl, &data[total], len - total); 
+        if (n <= 0) return false; 
+        total += n; 
     }
-    return true; // Успех
+    return true; 
 }
 
-// Извлечение заголовка "Host" из HTTP-запроса
 std::string getHostFromRequest(const std::string& request) {
-    size_t hostPos = request.find("Host:"); // Ищет "Host:"
-    if (hostPos == std::string::npos) return ""; // Не найдено
-    size_t start = hostPos + 5; // Пропускает "Host:"
-    while (start < request.size() && std::isspace(request[start])) start++; // Пропускает пробелы
-    size_t end = request.find_first_of("\r\n", start); // Ищет конец строки
-    if (end == std::string::npos) return ""; // Не найдено
-    return request.substr(start, end - start); // Возвращает имя хоста
+    size_t hostPos = request.find("Host:");
+    if (hostPos == std::string::npos) return "";
+    size_t start = hostPos + 5;
+    while (start < request.size() && std::isspace(request[start])) start++;
+    size_t end = request.find_first_of("\r\n", start); 
+    if (end == std::string::npos) return ""; 
+    return request.substr(start, end - start); 
 }
 
-// Чтение HTTP-ответа из сокета
 std::string readHttpResponse(int sock) {
-    std::string response; // Ответ
-    char buf[1024]; // Буфер для чтения
+    std::string response; 
+    char buf[1024]; 
     while (true) {
-        int n = recv(sock, buf, sizeof(buf), 0); // Читает данные из сокета
-        if (n <= 0) break; // Ошибка или конец данных
-        response.append(buf, n); // Добавляет данные в ответ
-        if (response.find("\r\n\r\n") != std::string::npos) { // Найден конец заголовков
-            size_t clPos = response.find("Content-Length:"); // Ищет длину тела
+        int n = recv(sock, buf, sizeof(buf), 0); 
+        if (n <= 0) break; 
+        response.append(buf, n); 
+        if (response.find("\r\n\r\n") != std::string::npos) { 
+            size_t clPos = response.find("Content-Length:"); 
             if (clPos != std::string::npos) {
-                size_t start = clPos + 15; // Пропускает "Content-Length:"
-                while (start < response.size() && std::isspace(response[start])) start++; // Пропускает пробелы
-                size_t end = response.find_first_of("\r\n", start); // Ищет конец строки
+                size_t start = clPos + 15; 
+                while (start < response.size() && std::isspace(response[start])) start++; 
+                size_t end = response.find_first_of("\r\n", start); 
                 if (end != std::string::npos) {
-                    int contentLength = std::stoi(response.substr(start, end - start)); // Длина тела
-                    size_t headerEnd = response.find("\r\n\r\n") + 4; // Конец заголовков
-                    int bodyRead = response.size() - headerEnd; // Прочитано тела
-                    while (bodyRead < contentLength) { // Читает остаток тела
+                    int contentLength = std::stoi(response.substr(start, end - start)); 
+                    size_t headerEnd = response.find("\r\n\r\n") + 4; 
+                    int bodyRead = response.size() - headerEnd; 
+                    while (bodyRead < contentLength) { 
                         n = recv(sock, buf, sizeof(buf), 0);
                         if (n <= 0) break;
                         response.append(buf, n);
@@ -65,13 +61,12 @@ std::string readHttpResponse(int sock) {
                     }
                 }
             }
-            break; // Завершает чтение после полного ответа
+            break; 
         }
     }
-    return response; // Возвращает ответ
+    return response;
 }
 
-// Добавление или замена заголовка X-Forwarded-For в HTTP-запросе
-std::string addOrReplaceXForwardedFor(const std::string& request, const std::string& clientIp);
+// std::string addOrReplaceXForwardedFor(const std::string& request, const std::string& clientIp);
 
 } // namespace tls

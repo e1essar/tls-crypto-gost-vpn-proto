@@ -6,10 +6,10 @@
 #include <iostream>
 
 int main(int argc, char* argv[]) {
-    int port = 4433; // Порт по умолчанию
-    std::string algorithm = "any"; // Алгоритм по умолчанию
-    std::string certFile = "../certs/cert.pem"; // Сертификат по умолчанию
-    std::string keyFile  = "../certs/key.pem"; // Ключ по умолчанию
+    int port = 4433;
+    std::string algorithm = "any";
+    std::string certFile = "../certs/cert.pem";
+    std::string keyFile  = "../certs/key.pem";
 
     static struct option longopts[] = {
         {"port",   required_argument, nullptr, 'p'},

@@ -1,10 +1,8 @@
-# ---------- БАЗОВЫЙ ОБРАЗ ----------
 FROM ubuntu:22.04
 
 # Отключаем диалоги APT
 ENV DEBIAN_FRONTEND=noninteractive
 
-# ---------- УСТАНАВЛИВАЕМ ЗАВИСИМОСТИ ----------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential \
@@ -16,7 +14,6 @@ RUN apt-get update && \
       ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------- КЛОНИРУЕМ И СБИРАЕМ gost-engine ----------
 RUN git clone https://github.com/gost-engine/engine.git /opt/engine && \
     cd /opt/engine && \
     git submodule update --init && \
@@ -29,7 +26,6 @@ RUN git clone https://github.com/gost-engine/engine.git /opt/engine && \
       .. && \
     cmake --build . --target install
 
-# ---------- НАСТРАИВАЕМ openssl.conf для GOST ----------
 RUN printf '\
 openssl_conf = openssl_init\n\
 \n\
@@ -45,6 +41,5 @@ dynamic_path = /usr/lib/ssl/engines/gost.so\n\
 default_algorithms = ALL\n' \
 > /etc/ssl/openssl.cnf
 
-# ---------- WORKDIR и CMD ----------
 WORKDIR /opt/engine
 CMD ["/bin/bash"]
