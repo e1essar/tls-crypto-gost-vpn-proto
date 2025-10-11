@@ -1,6 +1,6 @@
 #include "net/Server.h"
 #include "crypto/GostCipher.h"
-#include "engine/EngineLoader.h"
+#include "provider/ProviderLoader.h"
 #include "storage/FileKeyStore.h"
 #include <getopt.h>
 #include <iostream>
@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
 
     printf("Starting server on port %d with cipher '%s'\n", port, algorithm.c_str());
 
-    tls::EngineLoader loader;
+    tls::ProviderLoader loader;
     tls::FileKeyStore ks;
     tls::GostCipher gost(&loader, algorithm);
     tls::Server srv(&gost, &ks, port, certFile, keyFile);

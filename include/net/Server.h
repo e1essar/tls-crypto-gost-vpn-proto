@@ -5,17 +5,17 @@
 
 namespace tls {
 
-class Server { 
-public:
-    Server(ICipherStrategy* cs, IKeyStore* ks, int port, const std::string& certFile, const std::string& keyFile); 
-    bool run();
+    class Server {
+    public:
+        Server(ICipherStrategy* cs, IKeyStore* ks, int port, const std::string& certFile, const std::string& keyFile);
+        bool run();
 
-private:
-    ICipherStrategy* _cs; 
-    IKeyStore* _ks; 
-    int _port; 
-    std::string _certFile; 
-    std::string _keyFile; 
-};
+    private:
+        ICipherStrategy* _cs;
+        IKeyStore* _ks;
+        int _port;
+        std::string _certFile;
+        std::string _keyFile;
+    };
 
 } // namespace tls
