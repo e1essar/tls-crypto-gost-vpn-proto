@@ -75,8 +75,19 @@ bool Server::run() {
             memset(&hints, 0, sizeof(hints)); 
             hints.ai_family = AF_INET; 
             hints.ai_socktype = SOCK_STREAM;
-            if (getaddrinfo(host.c_str(), "80", &hints, &res) != 0) { 
-                printf("[Server] DNS resolution failed for %s\n", host.c_str());
+
+            std::string hostname = host;
+            std::string port = "80";
+
+            // Разбить host:port, если есть
+            auto pos = host.find(':');
+            if (pos != std::string::npos) {
+                hostname = host.substr(0, pos);
+                port = host.substr(pos + 1);
+            }
+
+            if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &res) != 0) {
+                printf("[Server] DNS resolution failed for %s\n", hostname.c_str());
                 continue;
             }
 
