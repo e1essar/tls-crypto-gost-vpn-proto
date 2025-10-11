@@ -1,6 +1,6 @@
 #include "net/Client.h"
 #include "crypto/GostCipher.h"
-#include "engine/EngineLoader.h"
+#include "provider/ProviderLoader.h"
 #include "storage/FileKeyStore.h"
 #include <getopt.h> // Для парсинга аргументов
 #include <iostream> // Для cerr
@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
 
     printf("Starting client to %s:%d with cipher '%s'\n", host.c_str(), port, algorithm.c_str());
 
-    tls::EngineLoader loader; // Создает загрузчик движков
+    tls::ProviderLoader loader; // Создает загрузчик движков
     tls::FileKeyStore ks; // Создает хранилище ключей
     tls::GostCipher gost(&loader, algorithm); // Создает стратегию шифрования
     tls::Client cli(&gost, &ks, host, port); // Создает клиента
