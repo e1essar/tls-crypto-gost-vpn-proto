@@ -1,10 +1,11 @@
-#include "crypto/GostCipher.h" // Подключает заголовок
-#include <openssl/err.h> // Для вывода ошибок OpenSSL
-#include <cstdio> // Для printf и stderr
+// tls-crypto-gost-vpn-proto-tls13\src\crypto\GostCipher.cpp
+#include "crypto/GostCipher.h" // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+#include <openssl/err.h> // пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ OpenSSL
+#include <cstdio> // пїЅпїЅпїЅ printf пїЅ stderr
 
 namespace tls {
 
-    std::vector<std::string> GostCipher::supportedSuites() { // Список ГОСТ-шифров
+    std::vector<std::string> GostCipher::supportedSuites() { // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅпїЅ
         return {
             "TLS_GOSTR341112_256_WITH_MAGMA_MGM_L",
             "TLS_GOSTR341112_256_WITH_MAGMA_MGM_S",

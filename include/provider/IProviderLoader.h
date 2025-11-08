@@ -1,5 +1,6 @@
+// tls-crypto-gost-vpn-proto-tls13\include\provider\IProviderLoader.h
 #pragma once
-#include <openssl/provider.h> // Новый API для провайдеров
+#include <openssl/provider.h> // пїЅпїЅпїЅпїЅпїЅ API пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 #include <string>
 
 namespace tls {
@@ -8,10 +9,10 @@ namespace tls {
     public:
         virtual ~IProviderLoader() = default;
 
-        // Загружает провайдер по имени (например, "gost" или "default")
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, "gost" пїЅпїЅпїЅ "default")
         virtual OSSL_PROVIDER* loadProvider(const std::string& name) = 0;
 
-        // Выгружает провайдер
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         virtual void unloadProvider(OSSL_PROVIDER* provider) = 0;
     };
 

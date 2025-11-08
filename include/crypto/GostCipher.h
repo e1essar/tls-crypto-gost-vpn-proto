@@ -1,3 +1,4 @@
+// tls-crypto-gost-vpn-proto-tls13\include\crypto\GostCipher.h
 #pragma once
 #include "ICipherStrategy.h" // Подключает интерфейс стратегии шифрования
 #include "../provider/IProviderLoader.h" // Подключает интерфейс загрузчика провайдера
