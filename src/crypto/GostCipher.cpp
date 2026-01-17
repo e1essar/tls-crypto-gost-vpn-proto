@@ -1,74 +1,71 @@
-#include "crypto/GostCipher.h" 
+// tls-crypto-gost-vpn-proto-tls13\src\crypto\GostCipher.cpp
+#include "crypto/GostCipher.h"
 #include <openssl/err.h>
-#include <cstdio> 
+#include <cstdio>
 
 namespace tls {
 
-std::vector<std::string> GostCipher::supportedSuites() { 
+std::vector<std::string> GostCipher::supportedSuites() {
+    // Оставляем ТОЛЬКО TLS 1.3 имена
     return {
-        "GOST2012-MAGMA-MAGMAOMAC",
-        "GOST2012-KUZNYECHIK-KUZNYECHIKOMAC",
-        "LEGACY-GOST2012-GOST8912-GOST8912",
-        "IANA-GOST2012-GOST8912-GOST8912",
-        "GOST2001-GOST89-GOST89"
+        "TLS_GOSTR341112_256_WITH_MAGMA_MGM_L",
+        "TLS_GOSTR341112_256_WITH_MAGMA_MGM_S",
+        "TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_L",
+        "TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_S"
     };
 }
 
-GostCipher::GostCipher(IEngineLoader* loader, const std::string& algorithm)
-  : _loader(loader)
-  , _algorithm(algorithm.empty() ? "any" : algorithm)
-{}
+GostCipher::GostCipher(IProviderLoader* loader, const std::string& algorithm)
+    : _loader(loader), _algorithm(algorithm.empty() ? "any" : algorithm) {}
 
 GostCipher::~GostCipher() {
-    if (_engine) {
-        ENGINE_finish(_engine);
-        ENGINE_free(_engine);
-    }
+    if (_gost)    _loader->unloadProvider(_gost);
+    if (_default) _loader->unloadProvider(_default);
 }
 
 bool GostCipher::configureContext(SSL_CTX* ctx) {
-    _engine = _loader->loadEngine("gost");
-    if (!_engine) {
-        fprintf(stderr, "Failed to load GOST engine\n");
+    _default = _loader->loadProvider("default");
+    _gost    = _loader->loadProvider("gostprov");
+
+    if (!_gost) {
+        fprintf(stderr, "Failed to load GOST provider\n");
         return false;
     }
-    ENGINE_set_default(_engine, ENGINE_METHOD_ALL);
 
-    auto all = supportedSuites();
+    SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
+    SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+
+    // SSL_CTX_set_security_level(ctx, 0);
+
     std::string cipherList;
+    auto suites = supportedSuites();
 
     if (_algorithm == "any") {
-        for (size_t i = 0; i < all.size(); ++i) {
-            cipherList += all[i];
-            if (i + 1 < all.size()) cipherList += ":";
+        for (size_t i = 0; i < suites.size(); ++i) {
+            cipherList += suites[i];
+            if (i + 1 < suites.size()) cipherList += ":";
         }
     } else {
         bool found = false;
-        for (auto& s : all) { 
+        for (auto& s : suites) {
             if (s == _algorithm) {
                 cipherList = s;
                 found = true;
                 break;
             }
         }
-        if (!found) { 
-            fprintf(stderr, "Unsupported GOST cipher: %s\n", _algorithm.c_str());
-            fprintf(stderr, "Supported suites:\n");
-            for (auto& s : all) fprintf(stderr, "  %s\n", s.c_str());
+        if (!found) {
+            fprintf(stderr, "Unsupported cipher suite: %s\n", _algorithm.c_str());
             return false;
         }
     }
 
-    printf("Configuring GOST cipher list: %s\n", cipherList.c_str());
-    if (SSL_CTX_set_cipher_list(ctx, cipherList.c_str()) != 1) {
+    printf("Configuring GOST TLS1.3 ciphersuites: %s\n", cipherList.c_str());
+    if (SSL_CTX_set_ciphersuites(ctx, cipherList.c_str()) != 1) {
         ERR_print_errors_fp(stderr);
         return false;
     }
-    SSL_CTX_set_info_callback(ctx, [](const SSL* ssl, int where, int) {
-        if (where & SSL_CB_HANDSHAKE_DONE) {
-            printf("Negotiated cipher: %s\n", SSL_get_cipher(ssl));
-        }
-    });
+
     return true;
 }
 

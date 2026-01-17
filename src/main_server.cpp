@@ -1,43 +1,56 @@
+// tls-crypto-gost-vpn-proto-tls13\src\main_server.cpp
 #include "net/Server.h"
 #include "crypto/GostCipher.h"
-#include "engine/EngineLoader.h"
+#include "provider/ProviderLoader.h"
 #include "storage/FileKeyStore.h"
 #include <getopt.h>
 #include <iostream>
+#include <csignal>
+
+static void ignore_sigpipe() {
+    std::signal(SIGPIPE, SIG_IGN);
+}
 
 int main(int argc, char* argv[]) {
-    int port = 4433;
-    std::string algorithm = "any";
-    std::string certFile = "../certs/cert.pem";
-    std::string keyFile  = "../certs/key.pem";
+    ignore_sigpipe();
 
-    static struct option longopts[] = {
-        {"port",   required_argument, nullptr, 'p'},
+    int port = 4433;
+    std::string algo = "any";
+    std::string cert = "certs/cert.pem";
+    std::string key  = "certs/key.pem";
+    std::string tunName = "";
+
+    static option opts[] = {
+        {"port", required_argument, nullptr, 'p'},
         {"cipher", required_argument, nullptr, 'c'},
-        {"cert",   required_argument, nullptr, 't'},
-        {"key",    required_argument, nullptr, 'k'},
-        {nullptr,   0,               nullptr,   0 }
+        {"cert", required_argument, nullptr, 't'},
+        {"key", required_argument, nullptr, 'k'},
+        {"tun", required_argument, nullptr, 'n'},
+        {nullptr, 0, nullptr, 0}
     };
-    int opt;
-    while ((opt = getopt_long(argc, argv, "p:c:t:k:", longopts, nullptr)) != -1) {
-        switch (opt) {
-            case 'p': port      = std::stoi(optarg); break;
-            case 'c': algorithm = optarg; break;
-            case 't': certFile  = optarg; break;
-            case 'k': keyFile   = optarg; break;
+    int o;
+    while ((o = getopt_long(argc, argv, "p:c:t:k:n:", opts, nullptr)) != -1) {
+        switch (o) {
+            case 'p': port = std::stoi(optarg); break;
+            case 'c': algo = optarg; break;
+            case 't': cert = optarg; break;
+            case 'k': key  = optarg; break;
+            case 'n': tunName = optarg; break;
             default:
                 std::cerr << "Usage: " << argv[0]
-                          << " [--port port] [--cipher suite]"
-                          << " [--cert cert.pem] [--key key.pem]\n";
+                          << " [--port n] [--cipher name] [--cert cert.pem] [--key key.pem] [--tun ifname]\n";
                 return 1;
         }
     }
 
-    printf("Starting server on port %d with cipher '%s'\n", port, algorithm.c_str());
-
-    tls::EngineLoader loader;
-    tls::FileKeyStore ks;
-    tls::GostCipher gost(&loader, algorithm);
-    tls::Server srv(&gost, &ks, port, certFile, keyFile);
-    return srv.run() ? 0 : 1;
+    try {
+        tls::ProviderLoader loader;
+        tls::FileKeyStore ks;
+        tls::GostCipher gost(&loader, algo);
+        tls::Server app(&gost, &ks, port, cert, key, tunName);
+        return app.run() ? 0 : 2;
+    } catch (const std::exception& e) {
+        std::cerr << "[server] fatal: " << e.what() << "\n";
+        return 3;
+    }
 }

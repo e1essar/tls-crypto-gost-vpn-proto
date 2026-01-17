@@ -1,72 +1,57 @@
 #pragma once
-#include <openssl/ssl.h> 
-#include <string> 
-#include <arpa/inet.h> 
+#include <openssl/ssl.h>
+#include <string>
+#include <arpa/inet.h>
+#include <cstdint>
+#include <cstdio>
 
 namespace tls {
 
-bool sendWithLength(SSL* ssl, const char* data, size_t len) {
-    uint32_t lenNet = htonl(len); 
-    if (SSL_write(ssl, &lenNet, 4) != 4) return false; 
-    if (SSL_write(ssl, data, len) != static_cast<int>(len)) return false; 
+inline bool ssl_write_all(SSL* ssl, const void* buf, size_t len) {
+    const auto* p = static_cast<const uint8_t*>(buf);
+    size_t total = 0;
+    while (total < len) {
+        const int n = SSL_write(ssl, p + total, static_cast<int>(len - total));
+        if (n <= 0) {
+            const int err = SSL_get_error(ssl, n);
+            if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) continue;
+            return false;
+        }
+        total += static_cast<size_t>(n);
+    }
     return true;
 }
 
-bool receiveWithLength(SSL* ssl, std::string& data) {
-    uint32_t lenNet; 
-    if (SSL_read(ssl, &lenNet, 4) != 4) return false; 
-    size_t len = ntohl(lenNet); 
-    data.resize(len); 
-    size_t total = 0; 
-    while (total < len) { 
-        int n = SSL_read(ssl, &data[total], len - total); 
-        if (n <= 0) return false; 
-        total += n; 
-    }
-    return true; 
-}
-
-std::string getHostFromRequest(const std::string& request) {
-    size_t hostPos = request.find("Host:");
-    if (hostPos == std::string::npos) return "";
-    size_t start = hostPos + 5;
-    while (start < request.size() && std::isspace(request[start])) start++;
-    size_t end = request.find_first_of("\r\n", start); 
-    if (end == std::string::npos) return ""; 
-    return request.substr(start, end - start); 
-}
-
-std::string readHttpResponse(int sock) {
-    std::string response; 
-    char buf[1024]; 
-    while (true) {
-        int n = recv(sock, buf, sizeof(buf), 0); 
-        if (n <= 0) break; 
-        response.append(buf, n); 
-        if (response.find("\r\n\r\n") != std::string::npos) { 
-            size_t clPos = response.find("Content-Length:"); 
-            if (clPos != std::string::npos) {
-                size_t start = clPos + 15; 
-                while (start < response.size() && std::isspace(response[start])) start++; 
-                size_t end = response.find_first_of("\r\n", start); 
-                if (end != std::string::npos) {
-                    int contentLength = std::stoi(response.substr(start, end - start)); 
-                    size_t headerEnd = response.find("\r\n\r\n") + 4; 
-                    int bodyRead = response.size() - headerEnd; 
-                    while (bodyRead < contentLength) { 
-                        n = recv(sock, buf, sizeof(buf), 0);
-                        if (n <= 0) break;
-                        response.append(buf, n);
-                        bodyRead += n;
-                    }
-                }
-            }
-            break; 
+inline bool ssl_read_all(SSL* ssl, void* buf, size_t len) {
+    auto* p = static_cast<uint8_t*>(buf);
+    size_t total = 0;
+    while (total < len) {
+        const int n = SSL_read(ssl, p + total, static_cast<int>(len - total));
+        if (n <= 0) {
+            const int err = SSL_get_error(ssl, n);
+            if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) continue;
+            return false;
         }
+        total += static_cast<size_t>(n);
     }
-    return response;
+    return true;
 }
 
-// std::string addOrReplaceXForwardedFor(const std::string& request, const std::string& clientIp);
+inline bool sendWithLength(SSL* ssl, const uint8_t* data, size_t len) {
+    if (len > 0xFFFFFFFFu) return false;
+    const uint32_t lenNet = htonl(static_cast<uint32_t>(len));
+    if (!ssl_write_all(ssl, &lenNet, sizeof(lenNet))) return false;
+    return ssl_write_all(ssl, data, len);
+}
+
+inline bool receiveWithLength(SSL* ssl, std::string& data) {
+    uint32_t lenNet = 0;
+    if (!ssl_read_all(ssl, &lenNet, sizeof(lenNet))) return false;
+    const uint32_t len = ntohl(lenNet);
+    if (len > (16u * 1024u * 1024u)) return false;
+    data.resize(len);
+    if (len == 0) return true;
+    return ssl_read_all(ssl, &data[0], len);
+}
 
 } // namespace tls

@@ -1,142 +1,122 @@
-#include "Server.h"
-#include "Utils.h"
-#include <openssl/ssl.h> 
-#include <openssl/err.h> 
-#include <netinet/in.h> 
-#include <unistd.h> 
-#include <cstdio> 
-#include <cstring> 
-#include <netdb.h> 
-#include <sys/socket.h> 
-#include <arpa/inet.h> 
-namespace tls {
+#include "net/Tun.h"
+#include "net/Server.h"
+#include "net/Utils.h"
+#include "crypto/GostCipher.h"
+#include "storage/FileKeyStore.h"
+#include "provider/ProviderLoader.h"
 
-Server::Server(ICipherStrategy* cs, IKeyStore* ks, int port,
-               const std::string& certFile, const std::string& keyFile)
- : _cs(cs), _ks(ks), _port(port), _certFile(certFile), _keyFile(keyFile) {}
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <cstdio>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
 
-bool Server::run() {
-    SSL_library_init(); 
-    OpenSSL_add_all_algorithms(); 
-    SSL_load_error_strings(); 
-
-    const SSL_METHOD* meth = TLS_server_method(); 
-    SSL_CTX* ctx = SSL_CTX_new(meth); 
-    if (!_cs->configureContext(ctx)) return false; 
-
-    if (!_ks->loadCertificate(ctx, _certFile)) return false; 
-    if (!_ks->loadPrivateKey(ctx, _keyFile)) return false; 
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0); 
-    if (sock < 0) { perror("socket"); return false; }
-
-    sockaddr_in addr{}; 
-    addr.sin_family = AF_INET; 
-    addr.sin_port   = htons(_port); 
-    addr.sin_addr.s_addr = INADDR_ANY; 
-
-    if (bind(sock, (sockaddr*)&addr, sizeof(addr)) < 0) { 
-        perror("bind"); return false;
+static void log_ip_packet(const uint8_t* data, size_t len, const char* tag) {
+    if (len < sizeof(iphdr)) {
+        printf("[%s] short/non-ip len=%zu\n", tag, len);
+        return;
     }
-    if (listen(sock, 1) < 0) { perror("listen"); return false; } 
-
-    printf("Server listening on port %d...\n", _port);
-    int client = accept(sock, nullptr, nullptr); 
-    if (client < 0) { perror("accept"); return false; }
-
-    sockaddr_in peer_addr{};
-    socklen_t peer_len = sizeof(peer_addr);
-    getpeername(client, (sockaddr*)&peer_addr, &peer_len);
-    std::string clientIp = inet_ntoa(peer_addr.sin_addr);
-
-    SSL* ssl = SSL_new(ctx); 
-    SSL_set_fd(ssl, client);
-    if (SSL_accept(ssl) <= 0) {
-        ERR_print_errors_fp(stderr);
-    } else {
-        while (true) {
-            std::string request; 
-            if (!receiveWithLength(ssl, request)) break;
-            printf("\n[Server] Received encrypted HTTP request from client (%zu bytes over TLS)\n", request.size());
-            printf("[Server] Decrypted HTTP request from client:\n%s\n", request.c_str());
-
-            std::string host = getHostFromRequest(request); 
-            if (host.empty()) {
-                printf("[Server] No Host header found\n");
-                break;
-            }
-            printf("[Server] Connecting to target host: %s\n", host.c_str());
-
-            // Добавляем/заменяем X-Forwarded-For
-            // std::string modRequest = addOrReplaceXForwardedFor(request, clientIp);
-            std::string modRequest = request;
-
-            struct addrinfo hints{}, *res; 
-            memset(&hints, 0, sizeof(hints)); 
-            hints.ai_family = AF_INET; 
-            hints.ai_socktype = SOCK_STREAM;
-            if (getaddrinfo(host.c_str(), "80", &hints, &res) != 0) { 
-                printf("[Server] DNS resolution failed for %s\n", host.c_str());
-                continue;
-            }
-
-            int targetSock = socket(res->ai_family, res->ai_socktype, res->ai_protocol); 
-            if (connect(targetSock, res->ai_addr, res->ai_addrlen) < 0) { 
-                perror("[Server] connect to target");
-                close(targetSock);
-                freeaddrinfo(res);
-                continue;
-            }
-
-            printf("[Server] Sending HTTP request to target server (%zu bytes, not encrypted):\n%s\n", modRequest.size(), modRequest.c_str());
-            send(targetSock, modRequest.data(), modRequest.size(), 0); 
-            std::string response = readHttpResponse(targetSock); 
-            close(targetSock); 
-            printf("[Server] Received HTTP response from target server (%zu bytes, not encrypted)\n", response.size());
-            printf("[Server] Sending encrypted response to client (%zu bytes over TLS)\n", response.size());
-
-            if (!sendWithLength(ssl, response.data(), response.size())) break; 
-            freeaddrinfo(res); 
-        }
-    }
-
-    SSL_free(ssl); 
-    close(client);
-    close(sock); 
-    SSL_CTX_free(ctx);
-    return true; 
+    const iphdr* ip = reinterpret_cast<const iphdr*>(data);
+    char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
+    in_addr s{ip->saddr}, d{ip->daddr};
+    inet_ntop(AF_INET, &s, src, sizeof(src));
+    inet_ntop(AF_INET, &d, dst, sizeof(dst));
+    printf("[%s] IPv4 proto=%u %s -> %s len=%zu\n", tag, ip->protocol, src, dst, len);
 }
 
-std::string addOrReplaceXForwardedFor(const std::string& request, const std::string& clientIp) {
-    std::string out;
-    size_t pos = 0;
-    size_t xffPos = request.find("X-Forwarded-For:");
-    size_t headersEnd = request.find("\r\n\r\n");
-    if (headersEnd == std::string::npos) headersEnd = request.size();
-    if (xffPos != std::string::npos && xffPos < headersEnd) {
-        // Заменить существующий X-Forwarded-For
-        size_t lineEnd = request.find("\r\n", xffPos);
-        out = request.substr(0, xffPos);
-        out += "X-Forwarded-For: " + clientIp + "\r\n";
-        if (lineEnd != std::string::npos)
-            out += request.substr(lineEnd + 2);
-    } else {
-        // Вставить X-Forwarded-For после Host
-        size_t hostPos = request.find("Host:");
-        if (hostPos != std::string::npos) {
-            size_t hostEnd = request.find("\r\n", hostPos);
-            if (hostEnd != std::string::npos) {
-                out = request.substr(0, hostEnd + 2);
-                out += "X-Forwarded-For: " + clientIp + "\r\n";
-                out += request.substr(hostEnd + 2);
-            } else {
-                out = request + "X-Forwarded-For: " + clientIp + "\r\n";
-            }
-        } else {
-            out = request + "X-Forwarded-For: " + clientIp + "\r\n";
-        }
+namespace tls {
+
+static int tcp_listen(int port) {
+    int s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) { perror("socket"); return -1; }
+    int on = 1; setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    sockaddr_in a{}; a.sin_family = AF_INET; a.sin_port = htons(port); a.sin_addr.s_addr = INADDR_ANY;
+    if (bind(s, (sockaddr*)&a, sizeof(a)) < 0) { perror("bind"); close(s); return -1; }
+    if (listen(s, 8) < 0) { perror("listen"); close(s); return -1; }
+    return s;
+}
+
+
+Server::Server(ICipherStrategy* cs, IKeyStore* ks, int port,
+               const std::string& certFile, const std::string& keyFile,
+               const std::string& tunName)
+: _cs(cs), _ks(ks), _port(port),
+  _certFile(certFile), _keyFile(keyFile), _tunName(tunName) {}
+
+bool Server::run() {
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_ssl_algorithms();
+
+    SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
+    if (!ctx) {
+        ERR_print_errors_fp(stderr);
+        return false;
     }
-    return out;
+    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
+    if (!_cs->configureContext(ctx)) { SSL_CTX_free(ctx); return false; }
+
+    if (!_ks->loadCertificate(ctx, _certFile)) { SSL_CTX_free(ctx); return false; }
+    if (!_ks->loadPrivateKey(ctx, _keyFile))   { SSL_CTX_free(ctx); return false; }
+
+    int ls = tcp_listen(_port);
+    if (ls < 0) { SSL_CTX_free(ctx); return false; }
+    printf("[server] listening on %d\n", _port);
+
+    int cs = accept(ls, nullptr, nullptr);
+    if (cs < 0) { perror("accept"); close(ls); SSL_CTX_free(ctx); return false; }
+
+    SSL* ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, cs);
+    if (SSL_accept(ssl) <= 0) {
+        ERR_print_errors_fp(stderr);
+        SSL_free(ssl); close(cs); close(ls); SSL_CTX_free(ctx); return false;
+    }
+
+    printf("[server] TLS accepted\n");
+    printf("[server][TLS] version=%s cipher=%s\n", SSL_get_version(ssl), SSL_get_cipher_name(ssl));
+
+    Tun tun(_tunName);
+    printf("[server] TUN ready: %s\n", tun.ifname().c_str());
+
+    std::atomic<bool> running{true};
+
+    std::thread t1([&] {
+        std::string frame;
+        while (running.load()) {
+            if (!receiveWithLength(ssl, frame)) {
+                fprintf(stderr, "[server] recv fail\n"); running=false; break;
+            }
+            log_ip_packet(reinterpret_cast<const uint8_t*>(frame.data()), frame.size(), "S TLS->TUN");
+            if (tun.writePacket(reinterpret_cast<const uint8_t*>(frame.data()), frame.size()) != (ssize_t)frame.size()) {
+                perror("[server] write(TUN)"); running=false; break;
+            }
+        }
+    });
+
+    std::thread t2([&] {
+        std::vector<uint8_t> buf(20000);
+        while (running.load()) {
+            ssize_t n = tun.readPacket(buf.data(), buf.size());
+            if (n <= 0) { perror("[server] read(TUN)"); running=false; break; }
+            log_ip_packet(buf.data(), (size_t)n, "S TUN->TLS");
+            if (!sendWithLength(ssl, buf.data(), (size_t)n)) { fprintf(stderr, "[server] send fail\n"); running=false; break; }
+        }
+    });
+
+    t1.join(); t2.join();
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    close(cs);
+    close(ls);
+    SSL_CTX_free(ctx);
+    return true;
 }
 
 } // namespace tls
