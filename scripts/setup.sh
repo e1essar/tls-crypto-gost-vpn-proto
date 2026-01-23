@@ -14,10 +14,10 @@ warn() { printf "\n\033[1;33m[!] %s\033[0m\n" "$*"; }
 die()  { printf "\n\033[1;31m[x] %s\033[0m\n" "$*"; exit 1; }
 
 if [[ $EUID -eq 0 ]]; then
-  warn "It is better to run this script as a non-root user. Continuing anyway."
+  warn "Запускать скрипт лучше от НЕ root. Буду продолжать, но это не обязательно."
 fi
 
-say "Detecting package manager and installing dependencies..."
+say "Определяю пакетный менеджер и ставлю зависимости…"
 PKG=""
 if command -v apt-get >/dev/null 2>&1; then
   PKG="apt-get"
@@ -44,23 +44,23 @@ elif command -v pacman >/dev/null 2>&1; then
     git base-devel cmake ninja autoconf automake libtool nasm \
     perl python dos2unix unzip
 else
-  die "No supported package manager found (apt/dnf/yum/pacman). Install dependencies manually."
+  die "Не нашёл подходящий пакетный менеджер (apt/dnf/yum/pacman). Установи зависимости вручную."
 fi
 
-say "Preparing working directory: $WORKDIR"
+say "Готовлю рабочую директорию: $WORKDIR"
 mkdir -p "$WORKDIR"
 if [[ -d "$REPO_DIR/.git" ]]; then
-  say "Repository already exists. Updating..."
+  say "Репозиторий уже существует. Обновляю…"
   git -C "$REPO_DIR" fetch --all --prune
   git -C "$REPO_DIR" reset --hard origin/HEAD
 else
-  say "Cloning repository: $REPO_URL"
+  say "Клонирую репозиторий: $REPO_URL"
   git clone --depth=1 "$REPO_URL" "$REPO_DIR"
 fi
 
-say "Checking/pulling libprov into $LIBPROV_DIR..."
+say "Проверяю/подтягиваю libprov в $LIBPROV_DIR…"
 if [[ -d "$LIBPROV_DIR/.git" ]]; then
-  say "libprov already exists. Updating..."
+  say "libprov уже есть. Обновляю…"
   git -C "$LIBPROV_DIR" fetch --all --prune
   if [[ -n "${LIBPROV_BRANCH:-}" ]]; then
     git -C "$LIBPROV_DIR" checkout -q "$LIBPROV_BRANCH"
@@ -69,7 +69,7 @@ if [[ -d "$LIBPROV_DIR/.git" ]]; then
     git -C "$LIBPROV_DIR" reset --hard origin/HEAD
   fi
 else
-  say "Cloning libprov into $LIBPROV_DIR..."
+  say "Клонирую libprov в $LIBPROV_DIR…"
   if [[ -n "${LIBPROV_BRANCH:-}" ]]; then
     git clone --depth=1 --branch "$LIBPROV_BRANCH" "$LIBPROV_URL" "$LIBPROV_DIR"
   else
@@ -77,49 +77,50 @@ else
   fi
 fi
 
-say "Making patches/openssl-tls1.3.patch executable (if present)..."
+say "Делаю исполняемым patches/openssl-tls1.3.patch (по запросу)…"
 if [[ -f "$REPO_DIR/patches/openssl-tls1.3.patch" ]]; then
   chmod +x "$REPO_DIR/patches/openssl-tls1.3.patch"
 else
-  warn "patches/openssl-tls1.3.patch not found — continuing."
+  warn "Файл patches/openssl-tls1.3.patch не найден — продолжаю."
 fi
 
-say "Normalizing line endings and making .github/before_script.sh and .github/script.sh executable..."
+say "Нормализую окончания строк и делаю исполняемыми .github/before_script.sh и .github/script.sh…"
 if [[ -f "$REPO_DIR/.github/before_script.sh" ]]; then
   dos2unix "$REPO_DIR/.github/before_script.sh" >/dev/null 2>&1 || true
   chmod +x "$REPO_DIR/.github/before_script.sh"
 else
-  warn ".github/before_script.sh not found."
+  warn ".github/before_script.sh не найден."
 fi
 if [[ -f "$REPO_DIR/.github/script.sh" ]]; then
   dos2unix "$REPO_DIR/.github/script.sh" >/dev/null 2>&1 || true
   chmod +x "$REPO_DIR/.github/script.sh"
 else
-  warn ".github/script.sh not found."
+  warn ".github/script.sh не найден."
 fi
 
 export PATCH_OPENSSL=1
 export OPENSSL_BRANCH=openssl-3.4.2
 
+### --- Запуск before_script.sh и script.sh ---
 pushd "$REPO_DIR" >/dev/null
 
 if [[ -x ".github/before_script.sh" ]]; then
-  say "Running .github/before_script.sh..."
+  say "Выполняю .github/before_script.sh…"
   bash ".github/before_script.sh"
 else
-  warn "Skipping before_script.sh (missing or not executable)."
+  warn "Пропускаю before_script.sh (нет файла или нет прав)."
 fi
 
 if [[ -x ".github/script.sh" ]]; then
-  say "Running .github/script.sh..."
+  say "Выполняю .github/script.sh…"
   bash ".github/script.sh"
 else
-  warn "Skipping script.sh (missing or not executable)."
+  warn "Пропускаю script.sh (нет файла или нет прав)."
 fi
 
 popd >/dev/null
 
-say "Locating where OpenSSL was installed..."
+say "Ищу, куда установился OpenSSL…"
 mapfile -t OPENSSL_CANDIDATES < <(
   {
     command -v openssl 2>/dev/null || true
@@ -131,16 +132,16 @@ OPENSSL_BIN=""
 if [[ ${#OPENSSL_CANDIDATES[@]} -gt 0 ]]; then
   OPENSSL_BIN="$(for f in "${OPENSSL_CANDIDATES[@]}"; do printf "%s\t%s\n" "$(stat -c %Y "$f" 2>/dev/null || echo 0)" "$f"; done | sort -nr | awk 'NR==1{print $2}')"
 fi
-[[ -n "$OPENSSL_BIN" ]] || warn "Could not find a custom openssl binary, will try the system one."
+[[ -n "$OPENSSL_BIN" ]] || warn "Не удалось найти кастомный openssl, попробую системный."
 if [[ -z "$OPENSSL_BIN" && -x "$(command -v openssl || true)" ]]; then
   OPENSSL_BIN="$(command -v openssl)"
 fi
-[[ -n "$OPENSSL_BIN" ]] || die "openssl not found. Check build logs."
+[[ -n "$OPENSSL_BIN" ]] || die "openssl не найден. Проверь логи сборки."
 
-OPENSSL_PREFIX="$(dirname "$(dirname "$OPENSSL_BIN")")"
+OPENSSL_PREFIX="$(dirname "$(dirname "$OPENSSL_BIN")")"   # …/bin/openssl => …/
 say "OPENSSL_PREFIX = $OPENSSL_PREFIX"
 
-say "Looking for the GOST provider module (*.so) in ossl-modules directories..."
+say "Ищу модуль провайдера GOST (*.so) в каталоге ossl-modules…"
 MODULES_DIR_CANDIDATES=()
 for p in "$OPENSSL_PREFIX/lib/ossl-modules" "$OPENSSL_PREFIX/lib64/ossl-modules" "/usr/local/lib/ossl-modules" "/usr/lib/ossl-modules"; do
   [[ -d "$p" ]] && MODULES_DIR_CANDIDATES+=("$p")
@@ -155,15 +156,15 @@ for d in "${MODULES_DIR_CANDIDATES[@]}"; do
 done
 
 if [[ -z "$GOST_MODULE_PATH" ]]; then
-  warn "Could not find gost*.so in standard directories. It may be located next to the engine build."
+  warn "Не нашёл gost*.so в стандартных каталогах. Возможно, его положили рядом с билдом engine."
   f="$(find "$REPO_DIR" -type f -name 'gost*.so' 2>/dev/null | head -n1 || true)"
   [[ -n "$f" ]] && GOST_MODULE_PATH="$f"
 fi
 
 if [[ -z "$GOST_MODULE_PATH" ]]; then
-  warn "GOST provider module not found right now. If script.sh installs it later/in another location, you can ignore this warning."
+  warn "Модуль провайдера GOST не найден прямо сейчас. Если script.sh ставит его позднее/в другое место — пропусти это предупреждение."
 else
-  say "Found GOST module: $GOST_MODULE_PATH"
+  say "Нашёл GOST модуль: $GOST_MODULE_PATH"
 fi
 
 if [[ -n "$GOST_MODULE_PATH" ]]; then
@@ -179,18 +180,22 @@ else
 fi
 say "OPENSSL_MODULES (dir) = $OPENSSL_MODULES_DIR"
 
-say "Writing environment variables to $ENV_FILE and sourcing them from $SHELL_RC..."
+say "Записываю переменные окружения в $ENV_FILE и подключаю их из $SHELL_RC…"
 
 cat > "$ENV_FILE" <<EOF
+# === GOST/OpenSSL environment (added by setup_gost.sh) ===
 export OPENSSL_ROOT="$OPENSSL_PREFIX"
 export PATH="\$OPENSSL_ROOT/bin:\$PATH"
+# Для загрузки провайдеров OpenSSL 3.x
 export OPENSSL_MODULES="$OPENSSL_MODULES_DIR"
+# Иногда полезно указать путь к libs (если бинарь вне системных путей)
 if [ -d "\$OPENSSL_ROOT/lib" ]; then
   export LD_LIBRARY_PATH="\$OPENSSL_ROOT/lib:\${LD_LIBRARY_PATH:-}"
 fi
 if [ -d "\$OPENSSL_ROOT/lib64" ]; then
   export LD_LIBRARY_PATH="\$OPENSSL_ROOT/lib64:\${LD_LIBRARY_PATH:-}"
 fi
+# Корень репозитория gost-engine (удобно для дальнейшей работы)
 export GOST_ENGINE_ROOT="$REPO_DIR"
 EOF
 
@@ -201,13 +206,14 @@ grep -qF ". \"$ENV_FILE\"" "$SHELL_RC" 2>/dev/null || {
 }
 
 if [[ -f "$ENV_FILE" ]]; then
-  say "Sourcing $ENV_FILE into the current session..."
+  say "Подгружаю $ENV_FILE в текущую сессию…"
+  # shellcheck disable=SC1090
   . "$ENV_FILE"
 else
-  warn "$ENV_FILE not found, skipping."
+  warn "$ENV_FILE не найден, пропускаю."
 fi
 
-say "Configuring openssl.cnf to auto-load the gost provider..."
+say "Настраиваю openssl.cnf для автоподключения провайдера gost…"
 
 mkdir -p "$HOME/opt"
 USER_OPENSSL_CNF="$HOME/opt/openssl.cnf"
@@ -221,11 +227,14 @@ OPENSSL_CNF=""
 for c in "${CANDIDATE_CONFS[@]}"; do
   [[ -f "$c" ]] && { OPENSSL_CNF="$c"; break; }
 done
-[[ -n "$OPENSSL_CNF" ]] || { echo "System openssl.cnf not found"; exit 1; }
+[[ -n "$OPENSSL_CNF" ]] || { echo "Не найден системный openssl.cnf"; exit 1; }
 
 cat > "$USER_OPENSSL_CNF" <<EOF
+# Пользовательский конфиг OpenSSL
+# Сначала подтянем системный:
 .include $OPENSSL_CNF
 
+# Дальше — наши добавления (если их нет в системном):
 openssl_conf = openssl_init
 
 [openssl_init]
@@ -240,14 +249,19 @@ activate = 1
 
 [gost_sect]
 activate = 1
+# Если модуль не в стандартном месте, можно явно указать:
+# module = $(dirname "${GOST_MODULE_PATH:-/nonexistent}")/gost.so
 EOF
 
 echo "export OPENSSL_CONF=\"$USER_OPENSSL_CNF\"" >> "$HOME/.gost-env.sh"
 
-say "Done. To verify in a NEW terminal session run:"
+say "Готово. Для проверки в НОВОЙ сессии терминала выполните:"
 cat <<'CHECK'
+  # Подгрузить окружение (если не открывали новую сессию)
   . "$HOME/.gost-env.sh"
+
+  # Проверка поддержки шифросьюты TLS 1.3 GOST (должно вывести описание без ошибки)
   openssl ciphers -tls1_3 -ciphersuites TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_S -
 CHECK
 
-say "Success. If you get an error, check OPENSSL_ROOT/OPENSSL_MODULES and that gost*.so exists."
+say "Успех. Если проверка выдаёт ошибку, посмотри переменные OPENSSL_ROOT/OPENSSL_MODULES и наличие gost*.so."

@@ -15,8 +15,8 @@
 #include <vector>
 #include <cstdio>
 
-#include <netinet/ip.h>
-#include <arpa/inet.h> 
+#include <netinet/ip.h>   // iphdr
+#include <arpa/inet.h>    // inet_ntop
 
 static void log_ip_packet(const uint8_t* data, size_t len, const char* tag) {
     if (len < sizeof(iphdr)) {
@@ -46,15 +46,10 @@ static int tcp_connect(const std::string& host, int port) {
     return s;
 }
 
-
 Client::Client(ICipherStrategy* cs, IKeyStore* ks,
                const std::string& host, int port,
-               const std::string& tunName,
-               const std::string& caFile,
-               const std::string& serverName,
-               bool verifyPeer)
-: _cs(cs), _ks(ks), _host(host), _port(port), _tunName(tunName),
-  _caFile(caFile), _serverName(serverName), _verifyPeer(verifyPeer) {}
+               const std::string& tunName)
+: _cs(cs), _ks(ks), _host(host), _port(port), _tunName(tunName) {}
 
 bool Client::run() {
     SSL_library_init();
@@ -63,53 +58,35 @@ bool Client::run() {
 
     SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
     if (!ctx) { ERR_print_errors_fp(stderr); return false; }
-    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 
     if (!_cs || !_cs->configureContext(ctx)) {
         SSL_CTX_free(ctx);
         return false;
     }
 
-    if (_verifyPeer) {
-        SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
-        if (!_caFile.empty()) {
-            if (SSL_CTX_load_verify_locations(ctx, _caFile.c_str(), nullptr) != 1) {
-                fprintf(stderr, "[client] Failed to load CA file: %s\n", _caFile.c_str());
-                ERR_print_errors_fp(stderr);
-                SSL_CTX_free(ctx);
-                return false;
-            }
-        } else {
-            if (SSL_CTX_set_default_verify_paths(ctx) != 1) {
-                fprintf(stderr, "[client] Failed to load default verify paths\n");
-                ERR_print_errors_fp(stderr);
-                SSL_CTX_free(ctx);
-                return false;
-            }
-        }
-    } else {
-        SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
-    }
+    // Тестовый стенд - verify отключен
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
+    // prod:
+    // SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
+    // SSL_CTX_load_verify_locations(ctx, "ca.pem", nullptr);
+    // X509_VERIFY_PARAM* param = SSL_CTX_get0_param(ctx);
+    // X509_VERIFY_PARAM_set1_host(param, "server.example.com", 0);
 
+    // TCP
     int s = tcp_connect(_host, _port);
     if (s < 0) { SSL_CTX_free(ctx); return false; }
 
+    // create SSL and make handshake
     SSL* ssl = SSL_new(ctx);
     if (!ssl) { ERR_print_errors_fp(stderr); close(s); SSL_CTX_free(ctx); return false; }
 
     SSL_set_fd(ssl, s);
-
-    if (!_serverName.empty()) {
-        SSL_set_tlsext_host_name(ssl, _serverName.c_str());
-        if (_verifyPeer) {
-            SSL_set1_host(ssl, _serverName.c_str());
-        }
-    }
     if (SSL_connect(ssl) <= 0) {
         ERR_print_errors_fp(stderr);
         SSL_free(ssl); close(s); SSL_CTX_free(ctx); return false;
     }
 
+    // --- ЛОГИ TLS ---
     printf("[client] TLS connected\n");
     printf("[client][TLS] version=%s cipher=%s\n", SSL_get_version(ssl), SSL_get_cipher_name(ssl));
 
@@ -118,6 +95,7 @@ bool Client::run() {
 
     std::atomic<bool> running{true};
 
+    // TUN -> TLS
     std::thread t1([&]{
         std::vector<uint8_t> buf(20000);
         while (running.load()) {
@@ -134,6 +112,7 @@ bool Client::run() {
         }
     });
 
+    // TLS -> TUN
     std::thread t2([&]{
         std::string frame;
         while (running.load()) {
@@ -159,4 +138,4 @@ bool Client::run() {
     return true;
 }
 
-} // namespace tls
+}

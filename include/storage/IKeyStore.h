@@ -11,4 +11,4 @@ public:
     virtual bool loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) = 0; 
 };
 
-} // namespace tls
+}

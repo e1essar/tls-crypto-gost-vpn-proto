@@ -1,19 +1,11 @@
-// tls-crypto-gost-vpn-proto-tls13\src\main_server.cpp
 #include "net/Server.h"
 #include "crypto/GostCipher.h"
 #include "provider/ProviderLoader.h"
 #include "storage/FileKeyStore.h"
 #include <getopt.h>
 #include <iostream>
-#include <csignal>
-
-static void ignore_sigpipe() {
-    std::signal(SIGPIPE, SIG_IGN);
-}
 
 int main(int argc, char* argv[]) {
-    ignore_sigpipe();
-
     int port = 4433;
     std::string algo = "any";
     std::string cert = "certs/cert.pem";
@@ -43,14 +35,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    try {
-        tls::ProviderLoader loader;
-        tls::FileKeyStore ks;
-        tls::GostCipher gost(&loader, algo);
-        tls::Server app(&gost, &ks, port, cert, key, tunName);
-        return app.run() ? 0 : 2;
-    } catch (const std::exception& e) {
-        std::cerr << "[server] fatal: " << e.what() << "\n";
-        return 3;
-    }
+    tls::ProviderLoader loader;
+    tls::FileKeyStore ks;
+    tls::GostCipher gost(&loader, algo);
+    tls::Server app(&gost, &ks, port, cert, key, tunName);
+    return app.run() ? 0 : 2;
 }

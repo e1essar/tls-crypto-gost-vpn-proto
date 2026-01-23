@@ -1,4 +1,3 @@
-// tls-crypto-gost-vpn-proto-tls13\src\crypto\GostCipher.cpp
 #include "crypto/GostCipher.h"
 #include <openssl/err.h>
 #include <cstdio>
@@ -6,7 +5,6 @@
 namespace tls {
 
 std::vector<std::string> GostCipher::supportedSuites() {
-    // Оставляем ТОЛЬКО TLS 1.3 имена
     return {
         "TLS_GOSTR341112_256_WITH_MAGMA_MGM_L",
         "TLS_GOSTR341112_256_WITH_MAGMA_MGM_S",
@@ -35,7 +33,8 @@ bool GostCipher::configureContext(SSL_CTX* ctx) {
     SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
     SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
 
-    // SSL_CTX_set_security_level(ctx, 0);
+    // Тестовый стенд — security level 0
+    SSL_CTX_set_security_level(ctx, 0);
 
     std::string cipherList;
     auto suites = supportedSuites();
@@ -69,4 +68,4 @@ bool GostCipher::configureContext(SSL_CTX* ctx) {
     return true;
 }
 
-} // namespace tls
+}

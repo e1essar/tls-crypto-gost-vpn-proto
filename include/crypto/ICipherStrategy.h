@@ -9,4 +9,4 @@ public:
     virtual bool configureContext(SSL_CTX* ctx) = 0;
 };
 
-} // namespace tls
+}

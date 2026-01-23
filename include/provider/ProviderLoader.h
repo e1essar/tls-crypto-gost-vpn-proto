@@ -11,4 +11,4 @@ namespace tls {
         void unloadProvider(OSSL_PROVIDER* provider) override;
     };
 
-} // namespace tls
+}

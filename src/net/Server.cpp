@@ -42,7 +42,6 @@ static int tcp_listen(int port) {
     return s;
 }
 
-
 Server::Server(ICipherStrategy* cs, IKeyStore* ks, int port,
                const std::string& certFile, const std::string& keyFile,
                const std::string& tunName)
@@ -55,11 +54,6 @@ bool Server::run() {
     OpenSSL_add_ssl_algorithms();
 
     SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
-    if (!ctx) {
-        ERR_print_errors_fp(stderr);
-        return false;
-    }
-    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
     if (!_cs->configureContext(ctx)) { SSL_CTX_free(ctx); return false; }
 
     if (!_ks->loadCertificate(ctx, _certFile)) { SSL_CTX_free(ctx); return false; }
@@ -119,4 +113,4 @@ bool Server::run() {
     return true;
 }
 
-} // namespace tls
+}

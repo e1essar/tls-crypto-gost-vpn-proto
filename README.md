@@ -40,11 +40,11 @@
 - OpenSSL **3.x**.
 - Для запуска именно в режиме ГОСТ TLS 1.3 нужен **GOST provider** (обычно модуль `gostprov.so` или `gost.so`).
 
-> Собрать проект можно и на «обычном» OpenSSL 3.x, но без GOST provider TLS‑handshake с ГОСТ ciphersuites не поднимется.
+> Проект представлен в демо-режиме, поэтому некоторые моменты выключены в целях отладки
 
 ---
 
-## Быстрый старт (сборка)
+## Сборка
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -162,21 +162,6 @@ sudo ./scripts/client.sh ping
   --tun tun0
 ```
 
-#### Верификация сертификата (опционально)
-
-По умолчанию прототип допускает режим без проверки сертификата (для упрощения демонстрации). При желании можно включить проверку:
-
-```bash
-./build/client --host 10.0.0.1 --port 4433 --cipher any --tun tun0 \
-  --verify --ca certs/cert.pem --servername localhost
-```
-
-- `--ca` включает проверку цепочки и загружает CA из файла.
-- `--servername` задаёт SNI и (вместе с `--verify`) включает проверку имени хоста.
-- `--insecure` принудительно отключает проверку.
-
----
-
 ## Поддерживаемые ГОСТ ciphersuites
 
 Список зашит в `GostCipher::supportedSuites()`:
@@ -208,10 +193,10 @@ sudo ./scripts/client.sh ping
 │   ├── main_client.cpp
 │   └── main_server.cpp
 ├── scripts/
-│   ├── setup.sh       # (опционально) сборка OpenSSL+GOST provider и env
+│   ├── setup.sh       # первичная установка и подгрузка зависимостей
 │   ├── server.sh      # поднять серверную часть (TUN+NAT)
 │   ├── client.sh      # поднять клиентскую часть (TUN+routes)
-│   └── load.sh        # быстрая проверка наличия ГОСТ suite в openssl
+│   └── load.sh        # загрузка окружений после перезапуска системы
 └── certs/
     ├── cert.pem
     └── key.pem
@@ -223,4 +208,4 @@ sudo ./scripts/client.sh ping
 
 ## Лицензия
 
-Проект предназначен для образовательных целей (дипломная работа). Если нужна явная лицензия (MIT/BSD/GPL) — добавьте файл `LICENSE`.
+Проект предназначен для образовательных целей (дипломная работа).

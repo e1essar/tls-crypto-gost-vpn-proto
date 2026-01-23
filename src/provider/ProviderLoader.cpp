@@ -19,4 +19,4 @@ void ProviderLoader::unloadProvider(OSSL_PROVIDER* provider) {
     if (provider) OSSL_PROVIDER_unload(provider);
 }
 
-} // namespace tls
+}

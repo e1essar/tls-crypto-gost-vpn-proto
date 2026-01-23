@@ -49,4 +49,4 @@ ssize_t Tun::writePacket(const uint8_t* buf, size_t len) {
     return write(_fd, buf, len);
 }
 
-} // namespace tls
+}

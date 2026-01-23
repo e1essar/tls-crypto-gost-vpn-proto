@@ -22,4 +22,4 @@ bool FileKeyStore::loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) {
     return true;
 }
 
-} // namespace tls
+}

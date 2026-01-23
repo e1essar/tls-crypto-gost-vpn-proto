@@ -13,4 +13,4 @@ public:
     bool loadPrivateKey(SSL_CTX* ctx, const std::string& keyFile) override;
 };
 
-} // namespace tls
+}
